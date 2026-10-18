@@ -1,0 +1,18 @@
+{
+  "name": "budget-famille",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Budget mensuel de Guillaume et Anne : appli web installable (PWA) pour téléphone Android, données dans Supabase.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "serve": "node serve.mjs"
+  },
+  "dependencies": {
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  }
+}

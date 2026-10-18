@@ -1,0 +1,3 @@
+Police Lora (fichier lora.woff, version allégée)
+Copyright The Lora Project Authors (https://github.com/cyrealtype/Lora-Cyrillic)
+Distribuée sous licence SIL Open Font License 1.1 : https://openfontlicense.org
