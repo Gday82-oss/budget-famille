@@ -88,7 +88,7 @@ function Synthese({ budget }) {
       <p className="synthese-rythme">{eurosRond(budget.depensesReel)} dépensés sur {eurosRond(budget.depensesPrevu)} prévus.</p>
       <dl className="soldes">
         <div><dt>Solde du mois</dt><dd className={budget.soldeReel < 0 ? 'negatif' : 'positif'}>{eurosSigne(budget.soldeReel)}</dd></div>
-        <div><dt>{budget.report ? 'Avec le report' : 'Solde prévu'}</dt>
+        <div><dt>{budget.report ? 'Solde avec report' : 'Solde prévu'}</dt>
           <dd className={(budget.report ? budget.soldeAvecReport : budget.soldePrevu) < 0 ? 'negatif' : 'positif'}>
             {eurosSigne(budget.report ? budget.soldeAvecReport : budget.soldePrevu)}
           </dd></div>

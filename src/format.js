@@ -35,8 +35,8 @@ export const dateLisible = (d) => {
   return new Date(d + 'T12:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
 };
 
-/** Transforme la saisie du pavé (« 23,4 ») en nombre (23.4). */
+/** Transforme une saisie (« 23,4 », « −585,04 », « -1 234,5 ») en nombre. Le signe moins est lu une seule fois. */
 export const lireMontant = (s) => {
-  const n = parseFloat(String(s).replace(/\s/g, '').replace(',', '.'));
+  const n = parseFloat(String(s).replace(/[\s\u00a0\u202f]/g, '').replace(/[\u2212\u2013]/g, '-').replace(',', '.'));
   return Number.isFinite(n) ? r2(n) : 0;
 };
