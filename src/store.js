@@ -97,6 +97,31 @@ export function useBudget() {
     };
   }, [session, synchroniser]);
 
+  // Actualisation automatique : toutes les 10 s, on lit le petit compteur de modifications ;
+  // si le mois affiché a changé (téléphone d'Anne, fichier Excel du PC…), on le recharge.
+  const versionsRef = useRef(null);
+  useEffect(() => {
+    if (!session) return undefined;
+    versionsRef.current = null;
+    let actif = true;
+    const regarder = async () => {
+      if (!actif || document.visibilityState !== 'visible' || !navigator.onLine) return;
+      try {
+        const liste = await api('versions_mois?select=mois_id,version');
+        const v = Object.fromEntries(liste.map((x) => [x.mois_id, x.version]));
+        const avant = versionsRef.current;
+        versionsRef.current = v;
+        if (!avant) return;
+        if (Object.keys(v).some((k) => !(k in avant))) await chargerListe();
+        const id = moisRef.current;
+        if (id && v[id] !== avant[id] && !fileAttente().length) await chargerMois(id);
+      } catch { /* réseau absent : on réessaiera */ }
+    };
+    regarder();
+    const minuterie = setInterval(regarder, 10000);
+    return () => { actif = false; clearInterval(minuterie); };
+  }, [session, chargerListe, chargerMois]);
+
   // Sans session : choisir un mois depuis le cache pour l'affichage hors ligne
   const changerMois = useCallback((id) => {
     setMoisId(id);

@@ -22,6 +22,34 @@ Adresse : **https://gday82-oss.github.io/budget-famille/**
 Les calculs reprennent ceux du classeur : Imprévus = 3,5 % des dépenses fixes et variables prévues ;
 Total général = fixes + variables + imprévus + économies + divers ; Solde = revenus − total général.
 
+## Synchronisation avec le fichier Excel du PC
+
+Le classeur `Budget_Guillaume-Anne.xlsx` du PC et l'appli restent identiques, dans les deux sens :
+
+- **Excel → téléphones** : à chaque enregistrement du fichier, les changements partent vers l'appli ;
+  les téléphones les affichent tout seuls en une dizaine de secondes.
+- **Téléphones → Excel** : une dépense saisie sur un téléphone s'ajoute à la formule du « Coût réel »
+  (`=a+b+c`), sa note va dans « Commentaires ».
+- Si une même valeur a changé des deux côtés, **l'Excel l'emporte**.
+- Si le fichier est **ouvert** dans LibreOffice, les changements venus des téléphones attendent sa fermeture
+  (rien n'est perdu).
+- Les lignes se créent et se renomment **dans Excel** ; une nouvelle feuille « Budget mensuel décembre 2026 »
+  crée le mois dans l'appli, et un mois préparé sur le téléphone crée sa feuille dans Excel.
+- Une sauvegarde du classeur est faite avant chaque écriture (`~/.local/share/budget-sync/sauvegardes`).
+
+Installation sur le PC (Linux Mint), dans un terminal :
+
+```bash
+wget -qO /tmp/installer-budget.sh https://raw.githubusercontent.com/Gday82-oss/budget-famille/main/synchro/installer.sh
+bash /tmp/installer-budget.sh
+```
+
+Le script installe les outils, demande l'e-mail et le mot de passe (non enregistré), montre un essai
+à blanc, puis lance la synchronisation automatique à chaque démarrage du PC.
+
+Commandes utiles : `systemctl --user status budget-sync` (état), `tail -f ~/.local/share/budget-sync/journal.log`
+(journal), `systemctl --user disable --now budget-sync` (arrêter).
+
 ## Installer sur le téléphone
 
 1. Ouvrir l'adresse ci-dessus dans **Chrome** sur le Samsung.
@@ -58,3 +86,5 @@ Organisation du code :
 | `src/xlsx.js` | Export Excel |
 | `src/ui/` | Écrans : accueil, saisie, détail d'une ligne, réglages, connexion |
 | `src/sw.js` | Service worker (ouverture hors ligne) |
+| `synchro/budget_sync.py` | Synchronisation du classeur Excel du PC avec l'appli |
+| `synchro/installer.sh` | Installation de la synchronisation sur le PC |
