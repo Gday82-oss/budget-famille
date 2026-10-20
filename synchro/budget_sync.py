@@ -513,7 +513,10 @@ class Synchro:
             if abs(report - rD) > 0.004:
                 plan.a(f"{nom_mois(mid)} : solde reporté {report:+.2f} €",
                        lambda r=report: self.appli.patch(f"mois?id=eq.{mid}", {"report_solde": r}))
-        if (rE is None and abs(rD) > 0.004) or (rE is not None and abs(report - rE) > 0.004):
+        if f.rang_report is not None and rE is None:
+            # formule personnalisée (ex. lien vers la feuille du mois précédent) : on n'y touche jamais
+            pass
+        elif (f.rang_report is None and abs(rD) > 0.004) or (rE is not None and abs(report - rE) > 0.004):
             self.ecrire_report(f, report, mois.get("note_report"))
             plan.x(f"{nom_mois(mid)} : solde reporté {report:+.2f} €")
         for etat in (etat_ecrit, etat_excel):
