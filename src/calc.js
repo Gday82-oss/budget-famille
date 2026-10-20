@@ -71,9 +71,41 @@ export function calculer(mois, lignesBrutes, reportLie) {
   };
 }
 
-/** Ligne « Courses » correspondant à la date : semaine 1 = jours 1-7, …, semaine 5 = 29-31. */
-export function ligneCourses(lignes, date) {
-  const jour = date ? Number(date.slice(8, 10)) : new Date().getDate();
+const jourMs = 86400000;
+const enDate = (iso) => new Date(`${iso}T12:00:00`);
+const versIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const ecart = (a, b) => Math.round((enDate(b) - enDate(a)) / jourMs);
+
+/** Début du mois de budget : date saisie, sinon premier revenu daté, sinon le 1er du mois. */
+export function debutDuMois(mois, lignes) {
+  if (mois?.debut) return mois.debut;
+  const dates = (lignes || []).filter((l) => l.bloc === 'revenu')
+    .flatMap((l) => (l.operations || []).map((o) => o.date)).filter(Boolean).sort();
+  return dates[0] || `${mois?.id}-01`;
+}
+
+/** Période du mois de budget : du premier revenu jusqu'à la veille du mois suivant (ou 31 jours). */
+export function periodeDuMois(mois, lignes, debutSuivant) {
+  const debut = debutDuMois(mois, lignes);
+  let fin;
+  if (debutSuivant && debutSuivant > debut) {
+    const d = enDate(debutSuivant); d.setDate(d.getDate() - 1); fin = versIso(d);
+  } else if (debut.endsWith('-01')) {
+    const d = enDate(debut); fin = versIso(new Date(d.getFullYear(), d.getMonth() + 1, 0, 12));
+  } else {
+    const d = enDate(debut); d.setDate(d.getDate() + 30); fin = versIso(d);
+  }
+  return { debut, fin, jours: ecart(debut, fin) + 1 };
+}
+
+/** Jour du mois de budget (1, 2, …) pour une date ; 0 si avant le début. */
+export function jourDuMois(periode, date) {
+  return ecart(periode.debut, date) + 1;
+}
+
+/** Ligne « Courses » correspondant à la date : semaine 1 = 7 premiers jours du mois de budget, …, semaine 5 = le reste. */
+export function ligneCourses(lignes, date, periode) {
+  const jour = periode ? Math.max(1, jourDuMois(periode, date || versIso(new Date()))) : (date ? Number(date.slice(8, 10)) : new Date().getDate());
   const n = Math.min(5, Math.ceil(jour / 7));
   return lignes.find((l) => l.groupe === 'Courses' && l.libelle === `Semaine ${n}`)
       || lignes.find((l) => l.groupe === 'Courses' && /^Semaine/.test(l.libelle));

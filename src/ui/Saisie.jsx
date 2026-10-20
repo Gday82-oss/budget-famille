@@ -1,7 +1,7 @@
 // Ajout ou modification d'une opération : pavé numérique, choix de la ligne, note, date.
 import { useEffect, useMemo, useState } from 'react';
-import { ligneCourses } from '../calc.js';
-import { aujourdhui, dateLisible, euros, lireMontant, moisCourant } from '../format.js';
+import { jourDuMois, ligneCourses } from '../calc.js';
+import { aujourdhui, dateLisible, euros, lireMontant } from '../format.js';
 import { Feuille } from './Feuille.jsx';
 import { Calendrier, Effacer } from './icones.jsx';
 
@@ -16,7 +16,7 @@ function taper(valeur, touche) {
   return ent === '0' ? touche : valeur + touche;
 }
 
-export function Saisie({ budget, moisId, initial = {}, actions, onFermer }) {
+export function Saisie({ budget, moisId, periode, dernierMois, initial = {}, actions, onFermer }) {
   const op = initial.operation;
   const lignes = budget.lignes;
   const ligneInit = lignes.find((l) => l.id === (op?.ligne_id || initial.ligneId));
@@ -27,7 +27,8 @@ export function Saisie({ budget, moisId, initial = {}, actions, onFermer }) {
     return (Number.isInteger(v) ? String(v) : v.toFixed(2)).replace('.', ',');
   });
   const [negatif, setNegatif] = useState(op ? Number(op.montant) < 0 : false);
-  const [date, setDate] = useState(op ? op.date : (moisId === moisCourant() ? aujourdhui() : null));
+  const dansLaPeriode = periode && jourDuMois(periode, aujourdhui()) >= 1 && jourDuMois(periode, aujourdhui()) <= periode.jours;
+  const [date, setDate] = useState(op ? op.date : (dansLaPeriode || moisId === dernierMois ? aujourdhui() : null));
   const [ligneId, setLigneId] = useState(ligneInit?.id || null);
   const [modeCourses, setModeCourses] = useState(false);
   const [note, setNote] = useState(op?.note || '');
@@ -46,8 +47,8 @@ export function Saisie({ budget, moisId, initial = {}, actions, onFermer }) {
   }, [sens, candidates]);
 
   useEffect(() => {
-    if (modeCourses) { const l = ligneCourses(lignes, date); if (l) setLigneId(l.id); }
-  }, [modeCourses, date, lignes]);
+    if (modeCourses) { const l = ligneCourses(lignes, date, periode); if (l) setLigneId(l.id); }
+  }, [modeCourses, date, lignes, periode]);
 
   // Saisie au clavier physique (ordinateur)
   useEffect(() => {
@@ -130,7 +131,7 @@ export function Saisie({ budget, moisId, initial = {}, actions, onFermer }) {
           <div className="puces" role="listbox" aria-label="Ligne du budget">
             {courseRaccourci && (
               <button type="button" role="option" aria-selected={modeCourses} className={`puce${modeCourses ? ' active' : ''}`}
-                onClick={() => { const l = ligneCourses(lignes, date); if (l) choisir(l, true); }}>Courses</button>
+                onClick={() => { const l = ligneCourses(lignes, date, periode); if (l) choisir(l, true); }}>Courses</button>
             )}
             {raccourcis.map((l) => (
               <button key={l.id} type="button" role="option" aria-selected={!modeCourses && ligneId === l.id}

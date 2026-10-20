@@ -1,19 +1,20 @@
 import { useState } from 'react';
 import { stock } from '../api.js';
-import { BLOCS } from '../calc.js';
-import { euros, eurosRond, eurosSigne, joursDansMois, moisCourant, moisDecale, nomMois, pourcent } from '../format.js';
+import { BLOCS, jourDuMois } from '../calc.js';
+import { aujourdhui, dateLisible, euros, eurosRond, eurosSigne, moisDecale, nomMois, pourcent } from '../format.js';
 import { Jauge } from './Jauge.jsx';
 import { Actualiser, Bas, Droite, Gauche, Menu, Nuage, Plus } from './icones.jsx';
 
-function avancementDuMois(moisId) {
-  const courant = moisCourant();
-  if (moisId < courant) return 1;
-  if (moisId > courant) return 0;
-  return new Date().getDate() / joursDansMois(moisId);
+/** Jour du mois de budget aujourd'hui, ou null si aujourd'hui est hors de sa période. */
+function jourEnCours(periode) {
+  if (!periode) return null;
+  const j = jourDuMois(periode, aujourdhui());
+  return j >= 1 && j <= periode.jours ? j : null;
 }
 
 export function Accueil({ etat, onAjouter, onLigne, onMenu, onPreparer }) {
-  const { budget, moisId, listeMois, reseau, enAttente, majLe, changerMois, synchroniser } = etat;
+  const { budget, moisId, listeMois, reseau, enAttente, majLe, changerMois, synchroniser, periode } = etat;
+  const jour = jourEnCours(periode);
   const [ouverts, setOuverts] = useState(() => new Set(stock.lire('groupes-ouverts', [])));
   const basculer = (cle) => {
     const n = new Set(ouverts);
@@ -25,7 +26,7 @@ export function Accueil({ etat, onAjouter, onLigne, onMenu, onPreparer }) {
   const dernier = listeMois[listeMois.length - 1]?.id;
   const precedent = moisId && premier && moisId > premier ? moisDecale(moisId, -1) : null;
   const suivantId = moisId ? moisDecale(moisId, 1) : null;
-  const suivant = suivantId && (suivantId <= dernier || suivantId <= moisCourant()) ? suivantId : null;
+  const suivant = suivantId && dernier && suivantId <= moisDecale(dernier, 1) ? suivantId : null;
 
   return (
     <div className="accueil">
@@ -57,7 +58,7 @@ export function Accueil({ etat, onAjouter, onLigne, onMenu, onPreparer }) {
           <Synthese budget={budget} />
           {BLOCS.map((b) => (
             <Bloc key={b.id} bloc={b} donnees={budget.parBloc[b.id]} ouverts={ouverts} basculer={basculer} onLigne={onLigne}
-              repere={b.id === 'variable' && moisId === moisCourant() ? avancementDuMois(moisId) : null} />
+              repere={b.id === 'variable' && jour ? jour / periode.jours : null} jour={jour} periode={periode} />
           ))}
           <p className="pied discret">
             {Number(etat.donnees?.mois?.taux_imprevus) > 0
@@ -97,7 +98,7 @@ function Synthese({ budget }) {
   );
 }
 
-function Bloc({ bloc, donnees, ouverts, basculer, onLigne, repere }) {
+function Bloc({ bloc, donnees, ouverts, basculer, onLigne, repere, jour, periode }) {
   if (!donnees.groupes.length) return null;
   const revenu = bloc.id === 'revenu';
   return (
@@ -106,7 +107,7 @@ function Bloc({ bloc, donnees, ouverts, basculer, onLigne, repere }) {
         <span>{bloc.titre}</span>
         <span className="bloc-total">{eurosRond(donnees.reel)}<span className="discret"> / {eurosRond(donnees.prevu)}</span></span>
       </h2>
-      {repere != null && <p className="bloc-aide discret">Le trait sur chaque barre marque le jour {new Date().getDate()} sur {joursDansMois(moisCourant())}.</p>}
+      {repere != null && <p className="bloc-aide discret">Le trait sur chaque barre marque le jour {jour} sur {periode.jours} du mois de budget (commencé le {dateLisible(periode.debut).toLowerCase()}).</p>}
       {donnees.groupes.length === 1 ? (
         // Un seul groupe dans ce bloc (épargne, revenus) : on montre directement ses lignes
         <ul className="groupes">

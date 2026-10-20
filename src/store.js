@@ -2,18 +2,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, ecrire, envoyerFile, fileAttente, HorsLigne, lireSession, SessionExpiree, stock, surFile, surSession } from './api.js';
 import { appliquer } from './local.js';
-import { calculer } from './calc.js';
-import { eurosSigne, moisCourant, nomMois } from './format.js';
+import { calculer, periodeDuMois } from './calc.js';
+import { aujourdhui, eurosSigne, moisCourant, nomMois } from './format.js';
 
 const cleCache = (moisId) => `cache-mois-${moisId}`;
 
-/** Mois à ouvrir : le mois en cours (même s'il reste à préparer), sinon le dernier mois connu. */
+/**
+ * Mois à ouvrir : le dernier mois de budget déjà commencé. Un mois commence au premier revenu
+ * encaissé (mois.debut) ; sans date, on considère qu'il commence le 1er du calendrier.
+ */
 function choisirMois(liste) {
-  const courant = moisCourant();
   if (!liste?.length) return null;
-  const dernier = liste[liste.length - 1].id;
-  if (liste.some((m) => m.id === courant) || courant > dernier) return courant;
-  return (liste.filter((m) => m.id <= courant).pop() || liste[liste.length - 1]).id;
+  const jour = aujourdhui();
+  const commences = liste.filter((m) => (m.debut || `${m.id}-01`) <= jour);
+  return (commences[commences.length - 1] || liste[0]).id;
 }
 
 const serveurInitialLe = () => { const id = choisirMois(stock.lire('cache-liste-mois', [])); return id ? stock.lire(cleCache(id))?.le || null : null; };
@@ -146,6 +148,12 @@ export function useBudget() {
     return d;
   }, [serveur, file, moisId]);
 
+  const periode = useMemo(() => {
+    if (!donnees?.mois) return null;
+    const suivant = listeMois.find((m) => m.id > donnees.moisId);
+    return periodeDuMois(donnees.mois, donnees.lignes, suivant?.debut);
+  }, [donnees, listeMois]);
+
   const budget = useMemo(() => (donnees?.mois
     ? calculer(donnees.mois, donnees.lignes, soldes[donnees.moisId]?.report_effectif)
     : null), [donnees, soldes]);
@@ -229,7 +237,7 @@ export function useBudget() {
 
   const enAttente = file.length;
   return {
-    session, membres, listeMois, soldes, moisId, donnees, budget, reseau, majLe, enAttente, message,
+    session, membres, listeMois, soldes, moisId, donnees, budget, periode, reseau, majLe, enAttente, message,
     fermerMessage: () => setMessage(null), changerMois, synchroniser, actions, signaler,
   };
 }

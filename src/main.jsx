@@ -48,7 +48,8 @@ function App() {
           onAjouter={(id) => setSaisie({ ligneId: id })} onModifierOperation={(operation) => setSaisie({ operation })} />
       )}
       {saisie && budget && (
-        <Saisie budget={budget} moisId={moisId} initial={saisie} actions={actions} onFermer={() => setSaisie(null)} />
+        <Saisie budget={budget} moisId={moisId} periode={etat.periode} dernierMois={etat.listeMois.at(-1)?.id}
+          initial={saisie} actions={actions} onFermer={() => setSaisie(null)} />
       )}
       {menu && (
         <Reglages etat={etat} onFermer={() => setMenu(false)} onPreparer={preparer}

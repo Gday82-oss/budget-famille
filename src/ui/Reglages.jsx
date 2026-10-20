@@ -18,6 +18,7 @@ export function Reglages({ etat, onFermer, onPreparer, onExporter, installation 
     e.preventDefault();
     if (edition === 'report') actions.modifierMois({ report_solde: lireMontant(valeur), report_auto: false, solde_fin: null });
     if (edition === 'fin') actions.modifierMois({ solde_fin: lireMontant(valeur), report_auto: false });
+    if (edition === 'debut') actions.modifierMois({ debut: valeur || null });
     if (edition === 'taux') actions.modifierMois({ taux_imprevus: Math.max(0, Math.min(100, lireMontant(valeur))) / 100 });
     setEdition(null);
   }
@@ -38,6 +39,22 @@ export function Reglages({ etat, onFermer, onPreparer, onExporter, installation 
               <span>Exporter en Excel</span>
               <span className="discret">Fichier au format de votre classeur, dans Téléchargements</span>
             </button>
+          </li>
+        )}
+        {mois && etat.periode && (
+          <li>
+            {edition === 'debut' ? (
+              <form className="menu-form" onSubmit={valider}>
+                <label className="champ"><span>Date du premier revenu encaissé pour ce mois de budget</span>
+                  <input autoFocus type="date" value={valeur} onChange={(e) => setValeur(e.target.value)} /></label>
+                <button type="submit" className="bouton principal petit">Enregistrer</button>
+              </form>
+            ) : (
+              <button type="button" className="menu-item" onClick={() => editer('debut', etat.periode.debut)}>
+                <span>Début du mois de budget</span>
+                <span className="discret">{new Date(`${etat.periode.debut}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}{mois.debut ? '' : ' (premier revenu noté)'}, jusqu’au {new Date(`${etat.periode.fin}T12:00:00`).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' })}</span>
+              </button>
+            )}
           </li>
         )}
         {mois && budget?.soldeFin != null && (
