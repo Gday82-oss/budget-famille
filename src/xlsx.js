@@ -10,8 +10,8 @@ const echap = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').repl
 const nombre = (n) => String(Math.round(n * 100) / 100);
 
 /** Construit les lignes du tableau : [{ cellules: { A: {t|n|f, s} } }] */
-export function feuilleDuMois(mois, lignes) {
-  const b = calculer(mois, lignes);
+export function feuilleDuMois(mois, lignes, reportLie) {
+  const b = calculer(mois, lignes, reportLie);
   const rangs = [];
   const ajouter = (cellules, style) => { rangs.push({ cellules, style }); return rangs.length; };
   const t = (v, s = 0) => ({ t: v, s });
@@ -90,7 +90,7 @@ export function feuilleDuMois(mois, lignes) {
   const rs = rangs.length + 1;
   ajouter({ A: t('SOLDE', 5), C: formule(`C${rr}-C${totauxBlocs.general ?? totauxBlocs.totales}`, b.soldePrevu, 6), D: formule(`D${rr}-D${totauxBlocs.general ?? totauxBlocs.totales}`, b.soldeReel, 6) });
   if (b.report) {
-    ajouter({ A: t('Report du mois précédent'), D: montant(b.report), F: mois.note_report ? t(mois.note_report, 4) : null });
+    ajouter({ A: t('Report du mois précédent'), D: montant(b.report), F: t(b.reportAuto ? 'Solde avec report du mois précédent' : (mois.note_report || 'Saisi à la main'), 4) });
     const rp = rangs.length;
     ajouter({ A: t('Solde avec report', 5), D: formule(`D${rs}+D${rp}`, b.soldeAvecReport, 6) });
   }
@@ -186,14 +186,14 @@ export function zip(fichiers) {
   return out;
 }
 
-export function classeurDuMois(mois, lignes) {
-  const { rangs } = feuilleDuMois(mois, lignes);
+export function classeurDuMois(mois, lignes, reportLie) {
+  const { rangs } = feuilleDuMois(mois, lignes, reportLie);
   return zip(fichiersXlsx(`Budget ${nomMois(mois.id)}`.slice(0, 31), xmlFeuille(rangs)));
 }
 
 /** Déclenche le téléchargement sur le téléphone (dossier Téléchargements). */
-export function telechargerMois(mois, lignes) {
-  const octets = classeurDuMois(mois, lignes);
+export function telechargerMois(mois, lignes, reportLie) {
+  const octets = classeurDuMois(mois, lignes, reportLie);
   const blob = new Blob([octets], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

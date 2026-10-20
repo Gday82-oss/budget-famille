@@ -12,7 +12,11 @@ export const BLOCS = [
   { id: 'revenu', titre: 'Revenus' },
 ];
 
-export function calculer(mois, lignesBrutes) {
+/**
+ * reportLie : quand le mois suit automatiquement le précédent (mois.report_auto),
+ * c'est le « solde avec report » du mois précédent, calculé par la base (vue soldes_mois).
+ */
+export function calculer(mois, lignesBrutes, reportLie) {
   const lignes = [...(lignesBrutes || [])].sort((a, b) => a.ordre - b.ordre);
   const base = lignes.filter((l) => l.bloc === 'fixe' || l.bloc === 'variable');
   const prevuBase = r2(base.reduce((s, l) => s + Number(l.prevu || 0), 0));
@@ -41,7 +45,8 @@ export function calculer(mois, lignesBrutes) {
   const depensesReel = somme(['fixe', 'variable', 'provision'], 'reel');
   const revenusPrevu = somme(['revenu'], 'prevu');
   const revenusReel = somme(['revenu'], 'reel');
-  const report = r2(mois?.report_solde || 0);
+  const auto = Boolean(mois?.report_auto);
+  const report = r2(auto && reportLie != null ? reportLie : (mois?.report_solde || 0));
   const soldeReel = r2(revenusReel - depensesReel);
 
   return {
@@ -57,6 +62,7 @@ export function calculer(mois, lignesBrutes) {
     soldePrevu: r2(revenusPrevu - depensesPrevu),
     soldeReel,
     report,
+    reportAuto: auto,
     soldeAvecReport: r2(soldeReel + report),
   };
 }

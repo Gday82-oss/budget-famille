@@ -8,6 +8,7 @@ export function Reglages({ etat, onFermer, onPreparer, onExporter, installation 
   const { budget, donnees, moisId, listeMois, session, actions, synchroniser, enAttente } = etat;
   const mois = donnees?.mois;
   const suivant = moisDecale(moisId, 1);
+  const precedent = moisDecale(moisId, -1);
   const suivantExiste = listeMois.some((m) => m.id === suivant);
   const [edition, setEdition] = useState(null);
   const [valeur, setValeur] = useState('');
@@ -15,7 +16,7 @@ export function Reglages({ etat, onFermer, onPreparer, onExporter, installation 
   function editer(champ, initial) { setEdition(champ); setValeur(initial); }
   function valider(e) {
     e.preventDefault();
-    if (edition === 'report') actions.modifierMois({ report_solde: lireMontant(valeur) });
+    if (edition === 'report') actions.modifierMois({ report_solde: lireMontant(valeur), report_auto: false });
     if (edition === 'taux') actions.modifierMois({ taux_imprevus: Math.max(0, Math.min(100, lireMontant(valeur))) / 100 });
     setEdition(null);
   }
@@ -42,16 +43,25 @@ export function Reglages({ etat, onFermer, onPreparer, onExporter, installation 
           <li>
             {edition === 'report' ? (
               <form className="menu-form" onSubmit={valider}>
-                <label className="champ"><span>Solde de fin du mois précédent, avec un moins s’il était négatif (par exemple -585,04)</span>
+                <label className="champ"><span>Solde de fin du mois précédent, avec un moins s’il était négatif (par exemple -585,04). Le report ne suivra plus automatiquement {nomMois(precedent, false).toLowerCase()}.</span>
                   <input autoFocus inputMode="text" value={valeur} onChange={(e) => setValeur(e.target.value)} /></label>
                 <button type="submit" className="bouton principal petit">Enregistrer</button>
               </form>
             ) : (
-              <button type="button" className="menu-item" onClick={() => editer('report', String(mois.report_solde ?? 0).replace('.', ','))}>
+              <button type="button" className="menu-item" onClick={() => editer('report', String(budget?.report ?? mois.report_solde ?? 0).replace('.', ','))}>
                 <span>Solde reporté du mois précédent</span>
-                <span className="discret">{eurosSigne(Number(mois.report_solde || 0))}</span>
+                <span className="discret">{eurosSigne(budget?.report ?? Number(mois.report_solde || 0))}
+                  {budget?.reportAuto ? `, suit automatiquement ${nomMois(precedent, false).toLowerCase()}` : ', saisi à la main'}</span>
               </button>
             )}
+          </li>
+        )}
+        {mois && !budget?.reportAuto && listeMois.some((m) => m.id === precedent) && (
+          <li>
+            <button type="button" className="menu-item" onClick={() => actions.modifierMois({ report_auto: true })}>
+              <span>Suivre automatiquement {nomMois(precedent, false).toLowerCase()}</span>
+              <span className="discret">Le report reprendra le solde avec report de {nomMois(precedent, false).toLowerCase()}, comme la formule du classeur</span>
+            </button>
           </li>
         )}
         {mois && (

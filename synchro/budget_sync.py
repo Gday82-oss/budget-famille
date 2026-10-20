@@ -130,9 +130,15 @@ def lire_taux(v):
     return None
 
 
+RE_REPORT_LIE = re.compile(r"=\s*D\d+\s*\+\s*\$?'?([^'!]+?)'?[!.]\$?D\$?\d+\s*")
+
+
 def lire_report(v):
+    """Case « solde avec report » -> montant fixe, "auto" (lié au mois précédent), ou None si formule inconnue."""
     if v is None or (isinstance(v, str) and not v.strip()):
         return 0.0
+    if isinstance(v, str) and RE_REPORT_LIE.fullmatch(v.strip()):
+        return "auto"
     if isinstance(v, (int, float)):
         return round(float(v), 2)
     m = re.fullmatch(r"=\s*D\d+\s*([+-])\s*(\d+(?:[.,]\d+)?)\s*", str(v))
@@ -167,6 +173,20 @@ def nom_feuille(mois_id):
 def nom_mois(mois_id):
     a, m = mois_id.split("-")
     return f"{MOIS_NOMS[int(m) - 1]} {a}"
+
+
+def meme_report(a, b):
+    if isinstance(a, str) or isinstance(b, str):
+        return a == b
+    return a is not None and b is not None and abs(a - b) < 0.005
+
+
+def report_appli(mois):
+    return "auto" if mois.get("report_auto") else round(float(mois.get("report_solde") or 0), 2)
+
+
+def corps_report(report):
+    return {"report_auto": True} if report == "auto" else {"report_auto": False, "report_solde": report}
 
 
 def fusion_valeur(base, excel, appli):
@@ -377,6 +397,7 @@ class Synchro:
             mid = mois_de_feuille(ws.title)
             if mid:
                 feuilles[mid] = Feuille(ws, mid)
+        self.feuilles = feuilles
         versions = self.appli.versions()
         mois_db, donnees = self.appli.charger()
         plan = Plan()
@@ -504,21 +525,23 @@ class Synchro:
                 ws.cell(f.rang_imprevus, 3).value = f"=ROUND(C{f.rang_total}*{taux * 100:g}%,2)" if taux else None
                 ws.cell(f.rang_imprevus, 1).value = f"IMPRÉVUS {str(round(taux * 100, 2)).replace('.', ',').rstrip('0').rstrip(',')}%"
                 plan.x(f"{nom_mois(mid)} : provision imprévus {taux * 100:g} %")
-        rB = (base or {}).get("report", float(mois["report_solde"]))
-        rD = float(mois["report_solde"])
+        rD = report_appli(mois)
+        rB = (base or {}).get("report", rD)
         rE = f.report
         report = rD
-        if rE is not None:
-            report = fusion_valeur(rB, rE, rD) if not premiere else rE
-            if abs(report - rD) > 0.004:
-                plan.a(f"{nom_mois(mid)} : solde reporté {report:+.2f} €",
-                       lambda r=report: self.appli.patch(f"mois?id=eq.{mid}", {"report_solde": r}))
         if f.rang_report is not None and rE is None:
-            # formule personnalisée (ex. lien vers la feuille du mois précédent) : on n'y touche jamais
-            pass
-        elif (f.rang_report is None and abs(rD) > 0.004) or (rE is not None and abs(report - rE) > 0.004):
-            self.ecrire_report(f, report, mois.get("note_report"))
-            plan.x(f"{nom_mois(mid)} : solde reporté {report:+.2f} €")
+            pass  # formule personnalisée inconnue : on n'y touche jamais
+        elif rE is not None:
+            report = rE if premiere else (rD if meme_report(rE, rB) else rE)
+            if not meme_report(report, rD):
+                plan.a(f"{nom_mois(mid)} : solde reporté {'lié au mois précédent' if report == 'auto' else f'{report:+.2f} €'}",
+                       lambda r=report: self.appli.patch(f"mois?id=eq.{mid}", corps_report(r)))
+            if not meme_report(report, rE):
+                self.ecrire_report(f, report, mois.get("note_report"), self.feuilles)
+                plan.x(f"{nom_mois(mid)} : solde reporté {'lié au mois précédent' if report == 'auto' else f'{report:+.2f} €'}")
+        elif report == "auto" or abs(report) > 0.004:
+            self.ecrire_report(f, report, mois.get("note_report"), self.feuilles)
+            plan.x(f"{nom_mois(mid)} : solde reporté {'lié au mois précédent' if report == 'auto' else f'{report:+.2f} €'}")
         for etat in (etat_ecrit, etat_excel):
             etat["taux"], etat["report"] = taux, report
         if rE is not None:
@@ -527,17 +550,26 @@ class Synchro:
             etat_excel["taux"] = tE
         return etat_ecrit, etat_excel
 
-    def ecrire_report(self, f, report, note):
+    def ecrire_report(self, f, report, note, feuilles):
         ws = f.ws
         if f.rang_solde is None:
             return
         rang = f.rang_report or (f.rang_solde + 2)
-        signe = "-" if report < 0 else "+"
         ws.cell(rang, 1).value = LIBELLE_REPORT
-        ws.cell(rang, 4).value = f"=D{f.rang_solde}{signe}{texte_montant(centimes(report))}"
+        if report == "auto":
+            precedents = [m for m in feuilles if m < f.mois_id]
+            if not precedents:
+                return
+            p = feuilles[max(precedents)]
+            cible = p.rang_report or p.rang_solde
+            ws.cell(rang, 4).value = f"=D{f.rang_solde}+'{p.ws.title}'!D{cible}"
+            ws.cell(rang, 6).value = f"Solde fin {nom_mois(p.mois_id)} =D{cible}"
+        else:
+            signe = "-" if report < 0 else "+"
+            ws.cell(rang, 4).value = f"=D{f.rang_solde}{signe}{texte_montant(centimes(report))}"
+            if note:
+                ws.cell(rang, 6).value = note
         ws.cell(rang, 4).number_format = ws.cell(f.rang_solde, 4).number_format
-        if note:
-            ws.cell(rang, 6).value = note
         f.rang_report = rang
 
     def fusionner_ligne(self, ws, mid, e, l, b, premiere, plan):
@@ -637,18 +669,15 @@ class Synchro:
     def creer_mois_appli(self, f, mois_db, donnees, plan):
         mid = f.mois_id
         report = f.report
-        if report is None or (f.rang_report is None):
-            precedent = max((m for m in donnees if m < mid), default=None)
-            report = 0.0
-            if precedent:
-                report = solde_avec_report(donnees[precedent])
+        if f.rang_report is None or report is None:
+            report = "auto"
             if f.rang_solde:
-                self.ecrire_report(f, report, f"Solde fin {nom_mois(precedent)}" if precedent else None)
-                plan.x(f"{nom_mois(mid)} : solde reporté {report:+.2f} €")
+                self.ecrire_report(f, report, None, self.feuilles)
+                plan.x(f"{nom_mois(mid)} : solde reporté lié au mois précédent")
         taux = f.taux if f.taux is not None else 0.035
 
         def faire():
-            self.appli.post("mois", {"id": mid, "report_solde": report, "taux_imprevus": taux}, retour=False)
+            self.appli.post("mois", {"id": mid, "taux_imprevus": taux, **corps_report(report)}, retour=False)
             corps = [{"mois_id": mid, "bloc": e["bloc"], "groupe": e["groupe"], "libelle": e["libelle"],
                       "categorie": e["categorie"], "prevu": e["prevu"] if e["prevu"] != "?" else None,
                       "code": "imprevus" if cle == "imprevus" else None, "commentaire": e["commentaire"],
@@ -709,8 +738,9 @@ class Synchro:
         taux = float(mois["taux_imprevus"])
         if f.rang_imprevus and f.rang_total:
             ws.cell(f.rang_imprevus, 3).value = f"=ROUND(C{f.rang_total}*{taux * 100:g}%,2)" if taux else None
-        report = float(mois["report_solde"])
-        self.ecrire_report(f, report, mois.get("note_report"))
+        report = report_appli(mois)
+        self.ecrire_report(f, report, mois.get("note_report"), dict(feuilles, **{mid: f}))
+        feuilles[mid] = f
         plan.x(f"nouvelle feuille « {ws.title} » ({len(lignes_snap)} lignes)")
         snap = {"taux": taux, "report": report, "lignes": lignes_snap}
         return snap, None

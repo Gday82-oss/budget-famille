@@ -22,6 +22,7 @@ export function useBudget() {
   const [session, setSession] = useState(lireSession());
   const [membres, setMembres] = useState(stock.lire('cache-membres'));
   const [listeMois, setListeMois] = useState(stock.lire('cache-liste-mois', []));
+  const [soldes, setSoldes] = useState(stock.lire('cache-soldes', {}));
   const [moisId, setMoisId] = useState(() => choisirMois(stock.lire('cache-liste-mois', [])));
   const [serveur, setServeur] = useState(() => { const id = choisirMois(stock.lire('cache-liste-mois', [])); return id ? stock.lire(cleCache(id)) : null; }); // { moisId, mois, lignes } reçu ou en cache
   const [file, setFile] = useState(fileAttente());
@@ -43,12 +44,15 @@ export function useBudget() {
   }, [signaler]);
 
   const chargerListe = useCallback(async () => {
-    const [m, l] = await Promise.all([
+    const [m, l, sol] = await Promise.all([
       api('membres?select=email,prenom'),
       api('mois?select=*&order=id.asc'),
+      api('soldes_mois?select=*').catch(() => []),
     ]);
     setMembres(m); stock.ecrire('cache-membres', m);
     setListeMois(l); stock.ecrire('cache-liste-mois', l);
+    const parMois = Object.fromEntries(sol.map((x) => [x.mois_id, x]));
+    setSoldes(parMois); stock.ecrire('cache-soldes', parMois);
     return { membres: m, liste: l };
   }, []);
 
@@ -112,7 +116,8 @@ export function useBudget() {
         const avant = versionsRef.current;
         versionsRef.current = v;
         if (!avant) return;
-        if (Object.keys(v).some((k) => !(k in avant))) await chargerListe();
+        // un mois a bougé (n'importe lequel) : les soldes en chaîne peuvent changer
+        if (Object.keys(v).some((k) => v[k] !== avant[k])) await chargerListe();
         const id = moisRef.current;
         if (id && v[id] !== avant[id] && !fileAttente().length) await chargerMois(id);
       } catch { /* réseau absent : on réessaiera */ }
@@ -141,7 +146,9 @@ export function useBudget() {
     return d;
   }, [serveur, file, moisId]);
 
-  const budget = useMemo(() => (donnees?.mois ? calculer(donnees.mois, donnees.lignes) : null), [donnees]);
+  const budget = useMemo(() => (donnees?.mois
+    ? calculer(donnees.mois, donnees.lignes, soldes[donnees.moisId]?.report_effectif)
+    : null), [donnees, soldes]);
 
   /** Enregistre une écriture : affichée tout de suite, envoyée maintenant ou plus tard. */
   const enregistrer = useCallback(async (entree, confirmation) => {
@@ -152,6 +159,7 @@ export function useBudget() {
     else {
       signaler(confirmation, 'ok');
       chargerMois(moisRef.current).catch(traiterErreur);
+      chargerListe().catch(traiterErreur);
     }
   }, [chargerMois, signaler, traiterErreur]);
 
@@ -203,7 +211,7 @@ export function useBudget() {
         const [srcMois] = await api(`mois?id=eq.${sourceId}&select=*`);
         const srcLignes = await api(`lignes?mois_id=eq.${sourceId}&select=*,operations(*)&order=ordre.asc`);
         const report = calculer(srcMois, srcLignes).soldeAvecReport;
-        const note = `Solde fin ${nomMois(sourceId).toLowerCase()} (${eurosSigne(report)})`;
+        const note = `Suit le solde de ${nomMois(sourceId).toLowerCase()}`;
         await api('rpc/preparer_mois', { method: 'POST', body: { source_id: sourceId, cible_id: cibleId, report, note } });
         await chargerListe();
         moisRef.current = cibleId;
@@ -221,7 +229,7 @@ export function useBudget() {
 
   const enAttente = file.length;
   return {
-    session, membres, listeMois, moisId, donnees, budget, reseau, majLe, enAttente, message,
+    session, membres, listeMois, soldes, moisId, donnees, budget, reseau, majLe, enAttente, message,
     fermerMessage: () => setMessage(null), changerMois, synchroniser, actions, signaler,
   };
 }

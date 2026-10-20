@@ -30,6 +30,13 @@ fi
 echo "Programme installé dans $DOSSIER"
 echo
 
+# Déjà installé et connecté : simple mise à jour du programme
+if [ -f "$HOME/.config/budget-sync/config.json" ] && systemctl --user is-enabled --quiet budget-sync.service 2>/dev/null; then
+  systemctl --user restart budget-sync.service
+  echo "Mise à jour faite : la synchronisation a redémarré avec la nouvelle version."
+  exit 0
+fi
+
 # 3. Connexion de ce PC (le mot de passe n'est pas enregistré)
 python3 "$DOSSIER/budget_sync.py" connexion
 echo

@@ -52,7 +52,7 @@ function App() {
       )}
       {menu && (
         <Reglages etat={etat} onFermer={() => setMenu(false)} onPreparer={preparer}
-          onExporter={() => { telechargerMois(donnees.mois, donnees.lignes); setMenu(false); }}
+          onExporter={() => { telechargerMois(donnees.mois, donnees.lignes, etat.soldes?.[moisId]?.report_effectif); setMenu(false); }}
           installation={invite ? async () => { invite.prompt(); await invite.userChoice; setInvite(null); setMenu(false); } : null} />
       )}
       <Message message={etat.message} onFermer={etat.fermerMessage} />
