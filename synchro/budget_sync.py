@@ -134,13 +134,20 @@ RE_REPORT_LIE = re.compile(r"=\s*D\d+\s*\+\s*\$?'?([^'!]+?)'?[!.]\$?D\$?\d+\s*")
 
 
 def lire_report(v):
-    """Case « solde avec report » -> montant fixe, "auto" (lié au mois précédent), ou None si formule inconnue."""
+    """Case « solde réel avec reprise » ->
+    - "auto" : formule liée au mois précédent (=D83+'Budget mensuel octobre 2026'!D85)
+    - nombre : report ajouté au solde du mois (=D83-585.04)
+    - {"fin": x} : solde réel de fin de mois tapé tel quel (-585,04)
+    - None : formule inconnue (jamais modifiée)"""
     if v is None or (isinstance(v, str) and not v.strip()):
         return 0.0
     if isinstance(v, str) and RE_REPORT_LIE.fullmatch(v.strip()):
         return "auto"
     if isinstance(v, (int, float)):
-        return round(float(v), 2)
+        return {"fin": round(float(v), 2)}
+    constante = lire_montants(v)
+    if constante is not None and isinstance(v, str) and not re.search(r"[A-Za-z]", v):
+        return {"fin": en_euros(sum(constante))}
     m = re.fullmatch(r"=\s*D\d+\s*([+-])\s*(\d+(?:[.,]\d+)?)\s*", str(v))
     if m:
         return round(float(m.group(2).replace(",", ".")) * (1 if m.group(1) == "+" else -1), 2)
@@ -176,17 +183,33 @@ def nom_mois(mois_id):
 
 
 def meme_report(a, b):
+    if isinstance(a, dict) or isinstance(b, dict):
+        return isinstance(a, dict) and isinstance(b, dict) and abs(a["fin"] - b["fin"]) < 0.005
     if isinstance(a, str) or isinstance(b, str):
         return a == b
     return a is not None and b is not None and abs(a - b) < 0.005
 
 
 def report_appli(mois):
+    if mois.get("solde_fin") is not None:
+        return {"fin": round(float(mois["solde_fin"]), 2)}
     return "auto" if mois.get("report_auto") else round(float(mois.get("report_solde") or 0), 2)
 
 
 def corps_report(report):
-    return {"report_auto": True} if report == "auto" else {"report_auto": False, "report_solde": report}
+    if isinstance(report, dict):
+        return {"report_auto": False, "solde_fin": report["fin"]}
+    if report == "auto":
+        return {"report_auto": True, "solde_fin": None}
+    return {"report_auto": False, "report_solde": report, "solde_fin": None}
+
+
+def decrire_report(report):
+    if isinstance(report, dict):
+        return f"solde réel de fin de mois {report['fin']:+.2f} €"
+    if report == "auto":
+        return "solde reporté lié au mois précédent"
+    return f"solde reporté {report:+.2f} €"
 
 
 def fusion_valeur(base, excel, appli):
@@ -534,14 +557,14 @@ class Synchro:
         elif rE is not None:
             report = rE if premiere else (rD if meme_report(rE, rB) else rE)
             if not meme_report(report, rD):
-                plan.a(f"{nom_mois(mid)} : solde reporté {'lié au mois précédent' if report == 'auto' else f'{report:+.2f} €'}",
+                plan.a(f"{nom_mois(mid)} : {decrire_report(report)}",
                        lambda r=report: self.appli.patch(f"mois?id=eq.{mid}", corps_report(r)))
             if not meme_report(report, rE):
                 self.ecrire_report(f, report, mois.get("note_report"), self.feuilles)
-                plan.x(f"{nom_mois(mid)} : solde reporté {'lié au mois précédent' if report == 'auto' else f'{report:+.2f} €'}")
-        elif report == "auto" or abs(report) > 0.004:
+                plan.x(f"{nom_mois(mid)} : {decrire_report(report)}")
+        elif report == "auto" or isinstance(report, dict) or abs(report) > 0.004:
             self.ecrire_report(f, report, mois.get("note_report"), self.feuilles)
-            plan.x(f"{nom_mois(mid)} : solde reporté {'lié au mois précédent' if report == 'auto' else f'{report:+.2f} €'}")
+            plan.x(f"{nom_mois(mid)} : {decrire_report(report)}")
         for etat in (etat_ecrit, etat_excel):
             etat["taux"], etat["report"] = taux, report
         if rE is not None:
@@ -564,6 +587,9 @@ class Synchro:
             cible = p.rang_report or p.rang_solde
             ws.cell(rang, 4).value = f"=D{f.rang_solde}+'{p.ws.title}'!D{cible}"
             ws.cell(rang, 6).value = f"Solde fin {nom_mois(p.mois_id)} =D{cible}"
+        elif isinstance(report, dict):
+            ws.cell(rang, 4).value = report["fin"]
+            ws.cell(rang, 6).value = "Solde réel de fin de mois (relevé)"
         else:
             signe = "-" if report < 0 else "+"
             ws.cell(rang, 4).value = f"=D{f.rang_solde}{signe}{texte_montant(centimes(report))}"

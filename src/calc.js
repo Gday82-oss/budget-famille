@@ -45,9 +45,12 @@ export function calculer(mois, lignesBrutes, reportLie) {
   const depensesReel = somme(['fixe', 'variable', 'provision'], 'reel');
   const revenusPrevu = somme(['revenu'], 'prevu');
   const revenusReel = somme(['revenu'], 'reel');
-  const auto = Boolean(mois?.report_auto);
-  const report = r2(auto && reportLie != null ? reportLie : (mois?.report_solde || 0));
   const soldeReel = r2(revenusReel - depensesReel);
+  // Solde réel de fin de mois saisi tel quel (relevé) : il prime, le report s'en déduit
+  const soldeFin = mois?.solde_fin == null ? null : r2(mois.solde_fin);
+  const auto = soldeFin == null && Boolean(mois?.report_auto);
+  const report = soldeFin != null ? r2(soldeFin - soldeReel)
+    : r2(auto && reportLie != null ? reportLie : (mois?.report_solde || 0));
 
   return {
     lignes: calc,
@@ -63,6 +66,7 @@ export function calculer(mois, lignesBrutes, reportLie) {
     soldeReel,
     report,
     reportAuto: auto,
+    soldeFin,
     soldeAvecReport: r2(soldeReel + report),
   };
 }

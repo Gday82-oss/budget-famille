@@ -16,7 +16,8 @@ export function Reglages({ etat, onFermer, onPreparer, onExporter, installation 
   function editer(champ, initial) { setEdition(champ); setValeur(initial); }
   function valider(e) {
     e.preventDefault();
-    if (edition === 'report') actions.modifierMois({ report_solde: lireMontant(valeur), report_auto: false });
+    if (edition === 'report') actions.modifierMois({ report_solde: lireMontant(valeur), report_auto: false, solde_fin: null });
+    if (edition === 'fin') actions.modifierMois({ solde_fin: lireMontant(valeur), report_auto: false });
     if (edition === 'taux') actions.modifierMois({ taux_imprevus: Math.max(0, Math.min(100, lireMontant(valeur))) / 100 });
     setEdition(null);
   }
@@ -39,7 +40,23 @@ export function Reglages({ etat, onFermer, onPreparer, onExporter, installation 
             </button>
           </li>
         )}
-        {mois && (
+        {mois && budget?.soldeFin != null && (
+          <li>
+            {edition === 'fin' ? (
+              <form className="menu-form" onSubmit={valider}>
+                <label className="champ"><span>Solde réel de fin de mois (relevé bancaire), avec un moins s’il est négatif</span>
+                  <input autoFocus inputMode="text" value={valeur} onChange={(e) => setValeur(e.target.value)} /></label>
+                <button type="submit" className="bouton principal petit">Enregistrer</button>
+              </form>
+            ) : (
+              <button type="button" className="menu-item" onClick={() => editer('fin', String(budget.soldeFin).replace('.', ','))}>
+                <span>Solde réel de fin de mois</span>
+                <span className="discret">{eurosSigne(budget.soldeFin)}, saisi tel quel (le report de {eurosSigne(budget.report)} s’en déduit)</span>
+              </button>
+            )}
+          </li>
+        )}
+        {mois && budget?.soldeFin == null && (
           <li>
             {edition === 'report' ? (
               <form className="menu-form" onSubmit={valider}>
@@ -56,7 +73,7 @@ export function Reglages({ etat, onFermer, onPreparer, onExporter, installation 
             )}
           </li>
         )}
-        {mois && !budget?.reportAuto && listeMois.some((m) => m.id === precedent) && (
+        {mois && !budget?.reportAuto && budget?.soldeFin == null && listeMois.some((m) => m.id === precedent) && (
           <li>
             <button type="button" className="menu-item" onClick={() => actions.modifierMois({ report_auto: true })}>
               <span>Suivre automatiquement {nomMois(precedent, false).toLowerCase()}</span>

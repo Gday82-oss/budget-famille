@@ -89,7 +89,9 @@ export function feuilleDuMois(mois, lignes, reportLie) {
   ajouter({});
   const rs = rangs.length + 1;
   ajouter({ A: t('SOLDE', 5), C: formule(`C${rr}-C${totauxBlocs.general ?? totauxBlocs.totales}`, b.soldePrevu, 6), D: formule(`D${rr}-D${totauxBlocs.general ?? totauxBlocs.totales}`, b.soldeReel, 6) });
-  if (b.report) {
+  if (b.soldeFin != null) {
+    ajouter({ A: t('Solde réel avec reprise solde mois précédent', 5), D: { n: b.soldeFin, s: 6 }, F: t('Solde réel de fin de mois saisi tel quel', 4) });
+  } else if (b.report) {
     ajouter({ A: t('Report du mois précédent'), D: montant(b.report), F: t(b.reportAuto ? 'Solde avec report du mois précédent' : (mois.note_report || 'Saisi à la main'), 4) });
     const rp = rangs.length;
     ajouter({ A: t('Solde avec report', 5), D: formule(`D${rs}+D${rp}`, b.soldeAvecReport, 6) });
