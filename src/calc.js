@@ -3,6 +3,7 @@
 // - Imprévus (prévu) = taux × (dépenses fixes + variables prévues), arrondi au centime
 // - Total général = fixes + variables + imprévus + économies + divers
 // - Solde = revenus − total général ; « avec report » ajoute le solde reporté du mois précédent
+// - Fin de mois prévue = solde avec report + revenus encore attendus − prévu restant sur chaque ligne
 import { r2 } from './format.js';
 
 export const BLOCS = [
@@ -46,6 +47,11 @@ export function calculer(mois, lignesBrutes, reportLie) {
   const revenusPrevu = somme(['revenu'], 'prevu');
   const revenusReel = somme(['revenu'], 'reel');
   const soldeReel = r2(revenusReel - depensesReel);
+  // ce qui reste prévu ligne par ligne (une ligne dépassée compte pour 0, elle ne « rend » rien aux autres)
+  const restePrevu = (blocs) => r2(calc.filter((l) => blocs.includes(l.bloc)).reduce((s, l) => s + Math.max(0, l.prevu - l.reel), 0));
+  const resteAPayer = restePrevu(['fixe', 'variable', 'provision']);
+  const resteVariables = restePrevu(['variable']);
+  const revenusAttendus = restePrevu(['revenu']);
   // Solde réel de fin de mois saisi tel quel (relevé) : il prime, le report s'en déduit
   const soldeFin = mois?.solde_fin == null ? null : r2(mois.solde_fin);
   const auto = soldeFin == null && Boolean(mois?.report_auto);
@@ -68,6 +74,9 @@ export function calculer(mois, lignesBrutes, reportLie) {
     reportAuto: auto,
     soldeFin,
     soldeAvecReport: r2(soldeReel + report),
+    resteAPayer, resteVariables, revenusAttendus,
+    // sur le compte en fin de mois si tout le prévu restant est dépensé et les revenus attendus arrivent
+    finDeMoisPrevue: r2(soldeReel + report + revenusAttendus - resteAPayer),
   };
 }
 

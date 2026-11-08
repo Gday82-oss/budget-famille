@@ -55,7 +55,7 @@ export function Accueil({ etat, onAjouter, onLigne, onMenu, onPreparer }) {
           : <APreparer moisId={moisId} listeMois={listeMois} onPreparer={onPreparer} />)
       ) : (
         <>
-          <Synthese budget={budget} />
+          <Synthese budget={budget} jour={jour} periode={periode} />
           {BLOCS.map((b) => (
             <Bloc key={b.id} bloc={b} donnees={budget.parBloc[b.id]} ouverts={ouverts} basculer={basculer} onLigne={onLigne}
               repere={b.id === 'variable' && jour ? jour / periode.jours : null} jour={jour} periode={periode} />
@@ -79,21 +79,33 @@ export function Accueil({ etat, onAjouter, onLigne, onMenu, onPreparer }) {
   );
 }
 
-function Synthese({ budget }) {
-  const depasse = budget.resteADepenser < 0;
+function Synthese({ budget, jour, periode }) {
+  const enCours = jour != null;
+  const principal = budget.soldeAvecReport;
+  const libelle = enCours ? "Sur le compte aujourd'hui" : budget.report ? 'Solde avec report' : 'Solde du mois';
+  const joursRestants = enCours ? periode.jours - jour + 1 : null;
+  const parJour = enCours ? budget.resteVariables / joursRestants : null;
+  const fin = enCours ? new Date(`${periode.fin}T12:00:00`).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : null;
   return (
     <section className="synthese" aria-label="Synthèse du mois">
-      <p className="synthese-libelle">{depasse ? 'Budget dépassé de' : 'Reste à dépenser'}</p>
-      <p className={`synthese-montant${depasse ? ' negatif' : ''}`}>{euros(Math.abs(budget.resteADepenser))}</p>
+      <p className="synthese-libelle">{libelle}</p>
+      <p className={`synthese-montant ${principal < 0 ? 'negatif' : 'positif'}`}>{eurosSigne(principal)}</p>
       <Jauge grande valeur={budget.depensesReel} total={budget.depensesPrevu} label="Dépenses du mois" />
       <p className="synthese-rythme">{eurosRond(budget.depensesReel)} dépensés sur {eurosRond(budget.depensesPrevu)} prévus.</p>
-      <dl className="soldes">
-        <div><dt>Solde du mois</dt><dd className={budget.soldeReel < 0 ? 'negatif' : 'positif'}>{eurosSigne(budget.soldeReel)}</dd></div>
-        <div><dt>{budget.report ? 'Solde avec report' : 'Solde prévu'}</dt>
-          <dd className={(budget.report ? budget.soldeAvecReport : budget.soldePrevu) < 0 ? 'negatif' : 'positif'}>
-            {eurosSigne(budget.report ? budget.soldeAvecReport : budget.soldePrevu)}
-          </dd></div>
-      </dl>
+      {enCours ? (
+        <dl className="soldes">
+          <div><dt>Fin de mois prévue</dt>
+            <dd className={budget.finDeMoisPrevue < 0 ? 'negatif' : 'positif'}>{eurosSigne(budget.finDeMoisPrevue)}</dd></div>
+          <div><dt>Par jour jusqu'au {fin}</dt>
+            <dd>{eurosRond(parJour)}</dd></div>
+        </dl>
+      ) : (
+        <dl className="soldes">
+          <div><dt>Solde du mois</dt><dd className={budget.soldeReel < 0 ? 'negatif' : 'positif'}>{eurosSigne(budget.soldeReel)}</dd></div>
+          <div><dt>Solde prévu</dt><dd className={budget.soldePrevu < 0 ? 'negatif' : 'positif'}>{eurosSigne(budget.soldePrevu)}</dd></div>
+        </dl>
+      )}
+      {enCours && <p className="synthese-rythme">Fin de mois prévue : si tout le budget restant est dépensé. Par jour : dépenses variables restantes ({eurosRond(budget.resteVariables)}) sur {joursRestants} jour{joursRestants > 1 ? 's' : ''}.</p>}
     </section>
   );
 }
