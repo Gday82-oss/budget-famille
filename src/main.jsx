@@ -75,7 +75,7 @@ if ('serviceWorker' in navigator && location.protocol !== 'file:') {
     nouvelleVersion = true;
     if (Date.now() - ouverteLe < 15000 || document.visibilityState === 'hidden') location.reload();
   });
-  navigator.serviceWorker.register('sw.js').then((reg) => {
+  navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((reg) => {
     // à chaque retour sur l'appli : appliquer une version déjà prête, ou en chercher une nouvelle
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;

@@ -5,7 +5,11 @@ const FICHIERS = __FICHIERS__;
 const CACHE = `budget-${VERSION}`;
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(FICHIERS)).then(() => self.skipWaiting()));
+  // cache: 'reload' : on va chercher les fichiers sur le serveur, jamais dans le cache du navigateur
+  // (sinon GitHub Pages, qui garde les fichiers 10 min, pouvait glisser l'ancien app.js dans la nouvelle version)
+  e.waitUntil(caches.open(CACHE)
+    .then((c) => c.addAll(FICHIERS.map((f) => new Request(f, { cache: 'reload' }))))
+    .then(() => self.skipWaiting()));
 });
 
 self.addEventListener('activate', (e) => {
