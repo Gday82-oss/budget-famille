@@ -260,13 +260,18 @@ class Feuille:
                 continue
             if bloc is None or groupe is None:
                 continue
+            prevu = lire_prevu(c)
             if imprevus:
                 self.rang_imprevus, self.taux = r, lire_taux(c)
+                if self.taux is None and prevu not in (None, "?"):
+                    self.taux = 0.0              # montant fixe (=160) : pas de provision en %
+                else:
+                    prevu = None                 # provision en % : calculée par l'appli
             cle = "imprevus" if imprevus else normaliser(libelle)
             self.lignes[cle] = dict(
                 rang=r, libelle="Imprévus" if imprevus else libelle, bloc=bloc, groupe=groupe,
                 categorie=str(b) if b is not None else None,
-                prevu=None if imprevus else lire_prevu(c), montants=lire_montants(d),
+                prevu=prevu, montants=lire_montants(d),
                 commentaire=" ".join(str(f).split()) if f not in (None, "") else None)
 
 
@@ -547,8 +552,11 @@ class Synchro:
                 plan.a(f"{nom_mois(mid)} : provision imprévus {taux * 100:g} %",
                        lambda t=taux: self.appli.patch(f"mois?id=eq.{mid}", {"taux_imprevus": t}))
             if abs(taux - tE) > 1e-9 and f.rang_total:
-                ws.cell(f.rang_imprevus, 3).value = f"=ROUND(C{f.rang_total}*{taux * 100:g}%,2)" if taux else None
-                ws.cell(f.rang_imprevus, 1).value = f"IMPRÉVUS {str(round(taux * 100, 2)).replace('.', ',').rstrip('0').rstrip(',')}%"
+                imp = d["lignes"].get("imprevus") or {}
+                fixe = float(imp["prevu"]) if imp.get("prevu") is not None else None
+                ws.cell(f.rang_imprevus, 3).value = f"=ROUND(C{f.rang_total}*{taux * 100:g}%,2)" if taux else fixe
+                ws.cell(f.rang_imprevus, 1).value = (f"IMPRÉVUS {str(round(taux * 100, 2)).replace('.', ',').rstrip('0').rstrip(',')}%"
+                                                     if taux else "Imprévus")
                 plan.x(f"{nom_mois(mid)} : provision imprévus {taux * 100:g} %")
         rD = report_appli(mois)
         rB = (base or {}).get("report", rD)
@@ -656,7 +664,7 @@ class Synchro:
 
         # montant prévu
         p_ecrit = p_excel = e["prevu"]
-        if l.get("code") != "imprevus" and e["prevu"] != "?":
+        if (l.get("code") != "imprevus" or e["prevu"] is not None) and e["prevu"] != "?":
             pD = float(l["prevu"]) if l["prevu"] is not None else None
             pE = e["prevu"]
             pB = (b or {}).get("prevu", pD) if not premiere else pD
@@ -770,7 +778,9 @@ class Synchro:
                                 "commentaire": com, "ids": [o["id"] for o in l["operations"]]}
         taux = float(mois["taux_imprevus"])
         if f.rang_imprevus and f.rang_total:
-            ws.cell(f.rang_imprevus, 3).value = f"=ROUND(C{f.rang_total}*{taux * 100:g}%,2)" if taux else None
+            imp = d["lignes"].get("imprevus") or {}
+            fixe = float(imp["prevu"]) if imp.get("prevu") is not None else None
+            ws.cell(f.rang_imprevus, 3).value = f"=ROUND(C{f.rang_total}*{taux * 100:g}%,2)" if taux else fixe
         report = report_appli(mois)
         self.ecrire_report(f, report, mois.get("note_report"), dict(feuilles, **{mid: f}))
         feuilles[mid] = f

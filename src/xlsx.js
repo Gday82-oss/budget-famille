@@ -45,7 +45,7 @@ export function feuilleDuMois(mois, lignes, reportLie) {
       const debut = rangs.length + 1;
       for (const l of g.lignes) {
         const r = rangs.length + 1;
-        const prevu = l.code === 'imprevus' ? null : montant(l.prevuSaisi == null ? null : Number(l.prevuSaisi));
+        const prevu = l.auto ? null : montant(l.prevuSaisi == null ? null : Number(l.prevuSaisi));
         ajouter({ A: t(l.libelle), B: l.categorie ? t(l.categorie) : null, C: prevu, D: sommeOps(l.operations), E: ecart(r), F: commentaire(l) ? t(commentaire(l), 4) : null });
         if (l.code === 'imprevus') rangImprevus = r;
         if (bloc.id === 'provision' && !groupeEpargne) rangsProvisions.push(r);
@@ -76,7 +76,7 @@ export function feuilleDuMois(mois, lignes, reportLie) {
       }
     }
     if (bloc.id === 'provision') {
-      if (rangImprevus) {
+      if (rangImprevus && Number(mois.taux_imprevus || 0) > 0) {
         const taux = Number(mois.taux_imprevus || 0);
         rangs[rangImprevus - 1].cellules.A = t(`Imprévus ${String(Math.round(taux * 1000) / 10).replace('.', ',')} %`);
         rangs[rangImprevus - 1].cellules.C = formule(`ROUND(C${totauxBlocs.totales}*${taux},2)`, b.imprevusPrevu);

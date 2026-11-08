@@ -11,7 +11,7 @@ export function Ligne({ ligne, membres, actions, onFermer, onAjouter, onModifier
   const [editNote, setEditNote] = useState(false);
   const [commentaire, setCommentaire] = useState(ligne.commentaire || '');
   const revenu = ligne.bloc === 'revenu';
-  const auto = ligne.code === 'imprevus';
+  const auto = Boolean(ligne.auto);
   const reste = ligne.prevu - ligne.reel;
   const prenom = (email) => membres?.find((m) => m.email === email)?.prenom;
 

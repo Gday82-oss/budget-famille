@@ -63,7 +63,7 @@ export function Accueil({ etat, onAjouter, onLigne, onMenu, onPreparer }) {
           <p className="pied discret">
             {Number(etat.donnees?.mois?.taux_imprevus) > 0
               ? `Provision imprévus : ${pourcent(Number(etat.donnees.mois.taux_imprevus))} des dépenses fixes et variables prévues.`
-              : 'Pas de provision imprévus ce mois-ci.'}
+              : 'Imprévus : montant fixe, non retiré de la fin de mois prévue.'}
           </p>
         </>
       )}
@@ -100,7 +100,7 @@ function Synthese({ budget, jour }) {
           <div><dt>Solde prévu</dt><dd className={budget.soldePrevu < 0 ? 'negatif' : 'positif'}>{eurosSigne(budget.soldePrevu)}</dd></div>
         </dl>
       )}
-      {enCours && <p className="synthese-rythme">Fin de mois prévue : si tout le budget restant est dépensé.</p>}
+      {enCours && <p className="synthese-rythme">Fin de mois prévue : si tout le budget restant est dépensé, hors imprévus.</p>}
     </section>
   );
 }

@@ -109,7 +109,9 @@ export function Reglages({ etat, onFermer, onPreparer, onExporter, installation 
             ) : (
               <button type="button" className="menu-item" onClick={() => editer('taux', String(Math.round(Number(mois.taux_imprevus) * 1000) / 10).replace('.', ','))}>
                 <span>Provision imprévus</span>
-                <span className="discret">{pourcent(Number(mois.taux_imprevus || 0))}, soit {euros(budget?.imprevusPrevu || 0)}</span>
+                <span className="discret">{Number(mois.taux_imprevus) > 0
+                  ? `${pourcent(Number(mois.taux_imprevus))}, soit ${euros(budget?.imprevusPrevu || 0)}`
+                  : `Aucune : montant fixe de ${euros(budget?.imprevusPrevu || 0)} sur la ligne Imprévus`}</span>
               </button>
             )}
           </li>

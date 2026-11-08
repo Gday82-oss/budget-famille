@@ -3,7 +3,8 @@
 // - Imprévus (prévu) = taux × (dépenses fixes + variables prévues), arrondi au centime
 // - Total général = fixes + variables + imprévus + économies + divers
 // - Solde = revenus − total général ; « avec report » ajoute le solde reporté du mois précédent
-// - Fin de mois prévue = solde avec report + revenus encore attendus − prévu restant sur chaque ligne
+// - Imprévus : 3,5 % (taux) des dépenses prévues, ou montant fixe saisi quand le taux est à 0
+// - Fin de mois prévue = solde avec report + revenus encore attendus − prévu restant sur chaque ligne (hors imprévus)
 import { r2 } from './format.js';
 
 export const BLOCS = [
@@ -26,8 +27,10 @@ export function calculer(mois, lignesBrutes, reportLie) {
   const calc = lignes.map((l) => {
     const ops = l.operations || [];
     const reel = r2(ops.reduce((s, o) => s + Number(o.montant), 0));
-    const prevu = l.code === 'imprevus' ? r2(prevuBase * taux) : r2(l.prevu || 0);
-    return { ...l, operations: ops, reel, prevu, prevuSaisi: l.prevu };
+    // Imprévus : provision en % si un taux est fixé, sinon montant fixe saisi sur la ligne
+    const auto = l.code === 'imprevus' && taux > 0;
+    const prevu = auto ? r2(prevuBase * taux) : r2(l.prevu || 0);
+    return { ...l, operations: ops, reel, prevu, prevuSaisi: l.prevu, auto };
   });
 
   const groupes = [];
@@ -48,7 +51,9 @@ export function calculer(mois, lignesBrutes, reportLie) {
   const revenusReel = somme(['revenu'], 'reel');
   const soldeReel = r2(revenusReel - depensesReel);
   // ce qui reste prévu ligne par ligne (une ligne dépassée compte pour 0, elle ne « rend » rien aux autres)
-  const restePrevu = (blocs) => r2(calc.filter((l) => blocs.includes(l.bloc)).reduce((s, l) => s + Math.max(0, l.prevu - l.reel), 0));
+  // les imprévus ne sont pas comptés : rien n'est mis de côté, seule une dépense réelle les fait apparaître
+  const restePrevu = (blocs) => r2(calc.filter((l) => blocs.includes(l.bloc) && l.code !== 'imprevus')
+    .reduce((s, l) => s + Math.max(0, l.prevu - l.reel), 0));
   const resteAPayer = restePrevu(['fixe', 'variable', 'provision']);
   const resteVariables = restePrevu(['variable']);
   const revenusAttendus = restePrevu(['revenu']);
@@ -65,7 +70,7 @@ export function calculer(mois, lignesBrutes, reportLie) {
       prevu: somme([b.id], 'prevu'), reel: somme([b.id], 'reel'), groupes: groupes.filter((g) => g.bloc === b.id),
     }])),
     prevuBase,
-    imprevusPrevu: r2(prevuBase * taux),
+    imprevusPrevu: calc.find((l) => l.code === 'imprevus')?.prevu ?? 0,
     depensesPrevu, depensesReel, revenusPrevu, revenusReel,
     resteADepenser: r2(depensesPrevu - depensesReel),
     soldePrevu: r2(revenusPrevu - depensesPrevu),
