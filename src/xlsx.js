@@ -39,16 +39,22 @@ export function feuilleDuMois(mois, lignes, reportLie) {
     if (TITRES_BLOCS[bloc.id]) { ajouter({}); ajouter({ A: t(TITRES_BLOCS[bloc.id], 3) }); }
     const sousTotaux = [];
     for (const g of groupes) {
-      if (bloc.id !== 'provision' && bloc.id !== 'revenu') ajouter({ A: t(g.nom, 3) });
+      // en provision, chaque groupe (ÉCONOMIES : imprévus, épargne, divers) a son titre et son sous-total, comme dans le classeur
+      const groupeEpargne = bloc.id === 'provision';
+      if ((bloc.id !== 'provision' && bloc.id !== 'revenu') || groupeEpargne) ajouter({ A: t(g.nom.toUpperCase(), 3) });
       const debut = rangs.length + 1;
       for (const l of g.lignes) {
         const r = rangs.length + 1;
         const prevu = l.code === 'imprevus' ? null : montant(l.prevuSaisi == null ? null : Number(l.prevuSaisi));
         ajouter({ A: t(l.libelle), B: l.categorie ? t(l.categorie) : null, C: prevu, D: sommeOps(l.operations), E: ecart(r), F: commentaire(l) ? t(commentaire(l), 4) : null });
         if (l.code === 'imprevus') rangImprevus = r;
-        if (bloc.id === 'provision') rangsProvisions.push(r);
+        if (bloc.id === 'provision' && !groupeEpargne) rangsProvisions.push(r);
       }
       const fin = rangs.length;
+      if (groupeEpargne) {
+        const r = ajouter({ A: t('Sous-total', 5), B: t(g.nom, 5), C: formule(`SUM(C${debut}:C${fin})`, g.prevu, 6), D: formule(`SUM(D${debut}:D${fin})`, g.reel, 6), E: formule(`C${rangs.length + 1}-D${rangs.length + 1}`, null, 6) });
+        rangsProvisions.push(r);
+      }
       if (bloc.id === 'fixe' || bloc.id === 'variable') {
         const r = ajouter({ A: t('Sous-total', 5), B: t(g.nom, 5), C: formule(`SUM(C${debut}:C${fin})`, g.prevu, 6), D: formule(`SUM(D${debut}:D${fin})`, g.reel, 6), E: formule(`C${rangs.length + 1}-D${rangs.length + 1}`, null, 6) });
         sousTotaux.push(r);

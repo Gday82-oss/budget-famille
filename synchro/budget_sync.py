@@ -61,7 +61,9 @@ SECTIONS = {"DÉPENSES FIXES": "fixe", "DEPENSES FIXES": "fixe", "DÉPENSES VARI
             "DEPENSES VARIABLES": "variable", "REVENUS": "revenu"}
 GROUPES = {"ENFANTS": "Enfants", "FRAIS LOGEMENT + TÉLÉPHONE": "Logement & téléphone",
            "ASSURANCES – IMPÔTS": "Assurances & impôts", "CRÉDITS": "Crédits", "AUTRES": "Autres",
-           "COURSES ALIMENTATION/ LOGEMENT": "Courses", "VOITURES": "Voitures", "LOISIRS ET DIVERS": "Loisirs & divers"}
+           "COURSES ALIMENTATION/ LOGEMENT": "Courses", "VOITURES": "Voitures", "LOISIRS ET DIVERS": "Loisirs & divers",
+           "ÉCONOMIES": "Économies", "ECONOMIES": "Économies", "ÉPARGNE": "Économies", "EPARGNE": "Économies"}
+GROUPE_PROVISIONS = "Imprévus & divers"   # imprévus et divers, avant tout en-tête de groupe
 LIBELLE_REPORT = "Solde réel avec reprise solde mois précédent"
 
 
@@ -240,8 +242,8 @@ class Feuille:
             if haut.startswith(("SOLDE RÉEL", "SOLDE REEL")) or "REPRISE" in haut:
                 self.rang_report, self.report = r, lire_report(d)
                 continue
-            if re.match(r"SOUS[ -]TOTAL D[ÉE]PENSES TOTALES|D[ÉE]PENSES TOTALES", haut):
-                self.rang_total, bloc, groupe = r, "provision", "Épargne & divers"
+            if re.match(r"SOUS[ -]TOTAL D[ÉE]PENSES( TOTALES)?$|SOUS[ -]TOTAL D[ÉE]PENSES TOTALES|D[ÉE]PENSES TOTALES", haut):
+                self.rang_total, bloc, groupe = r, "provision", GROUPE_PROVISIONS
                 continue
             if haut.startswith(("SOUS TOTAL", "SOUS-TOTAL", "TOTAL")):
                 continue
@@ -253,7 +255,7 @@ class Feuille:
                 groupe = "Revenus" if bloc == "revenu" else None
                 continue
             imprevus = haut.startswith(("IMPRÉVUS", "IMPREVUS"))
-            if not imprevus and bloc in ("fixe", "variable") and b is None and c is None and d is None:
+            if not imprevus and bloc in ("fixe", "variable", "provision") and b is None and c is None and d is None:
                 groupe = GROUPES.get(haut, libelle[:1].upper() + libelle[1:].lower())
                 continue
             if bloc is None or groupe is None:
@@ -646,6 +648,11 @@ class Synchro:
                 ws.cell(e["rang"], 4).value = valeur_montants(liste)
                 plan.x(f"{nom} : coût réel {valeur_montants(liste)}")
             m_ecrit, m_excel = liste, excel_montants
+
+        # place de la ligne dans la feuille (lignes insérées ou déplacées dans Excel)
+        if l.get("ordre") != e["rang"]:
+            plan.a(f"{nom} : ligne {e['rang']} de la feuille",
+                   lambda v=e["rang"], i=l["id"]: self.appli.patch(f"lignes?id=eq.{i}", {"ordre": v}))
 
         # montant prévu
         p_ecrit = p_excel = e["prevu"]
