@@ -63,7 +63,24 @@ function App() {
 
 createRoot(document.getElementById('racine')).render(<App />);
 
-// Service worker : appli disponible hors ligne ; une nouvelle version s'installe en arrière-plan
+// Service worker : appli disponible hors ligne ; une nouvelle version s'installe en arrière-plan.
+// Quand elle prend la main, on recharge : tout de suite si l'appli vient de s'ouvrir (rien de saisi),
+// sinon au prochain retour sur l'appli, pour ne pas couper une saisie en cours.
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  const ouverteLe = Date.now();
+  const avaitUneVersion = Boolean(navigator.serviceWorker.controller);
+  let nouvelleVersion = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!avaitUneVersion || nouvelleVersion) return;
+    nouvelleVersion = true;
+    if (Date.now() - ouverteLe < 15000 || document.visibilityState === 'hidden') location.reload();
+  });
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    // à chaque retour sur l'appli : appliquer une version déjà prête, ou en chercher une nouvelle
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') return;
+      if (nouvelleVersion) location.reload();
+      else reg.update().catch(() => {});
+    });
+  }).catch(() => {});
 }
