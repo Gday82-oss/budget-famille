@@ -10,7 +10,7 @@ import { r2 } from './format.js';
 export const BLOCS = [
   { id: 'fixe', titre: 'Dépenses fixes' },
   { id: 'variable', titre: 'Dépenses variables' },
-  { id: 'provision', titre: 'Épargne et divers' },
+  { id: 'provision', titre: 'Épargne' },
   { id: 'revenu', titre: 'Revenus' },
 ];
 
